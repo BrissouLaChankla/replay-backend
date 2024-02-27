@@ -12,6 +12,8 @@ var app = express();
 
 const cors = require('cors');
 app.use(cors());
+
+
 app.use('/uploads', express.static('uploads'));
 app.use(logger('dev'));
 app.use(express.json());
