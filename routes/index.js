@@ -1,8 +1,16 @@
 var express = require('express');
 var router = express.Router();
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
+const fs = require('fs')
 
-// Multer
-const multer = require('multer')
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY,
+  api_secret: process.env.API_SECRET
+});
+
+
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -28,10 +36,10 @@ router.get('/', function (req, res, next) {
 
 router.get('/latest/:nbOfFetch', function (req, res, next) {
   Video.find({}).sort('-date').skip(req.params.nbOfFetch * 6).limit(7).populate("players").populate("tags").then(videos => {
-    if(videos.length < 7) {
-      res.json({ videos:videos.slice(0,6), lastFetch:true })
+    if (videos.length < 7) {
+      res.json({ videos: videos.slice(0, 6), lastFetch: true })
     } else {
-      res.json({ videos:videos.slice(0,6), lastFetch:false })
+      res.json({ videos: videos.slice(0, 6), lastFetch: false })
     }
   })
 
@@ -58,7 +66,7 @@ router.get('/playerNTags', async (req, res) => {
 });
 
 router.post('/store', upload.single('uploaded_file'), async function (req, res) {
-  const { filename } = req.file
+  const { path } = req.file
 
   const players = [];
   const tags = [];
@@ -71,17 +79,29 @@ router.post('/store', upload.single('uploaded_file'), async function (req, res) 
     }
   }
 
-  const newVideo = await new Video({
-    src: filename,
-    date: new Date(),
-    title: req.body.title,
-    tags,
-    players
-  })
+  cloudinary.uploader.upload(path, {
+    resource_type: "video",
+  },
+    async function (error, result) {
+      if (error) {
+        console.log(error)
+        return res.status(500).send("Erreur lors du téléchargement du fichier : " + error.message);
+      }
 
-  const newVid = await newVideo.save();
+      const newVideo = await new Video({
+        src: result.url,
+        date: new Date(),
+        title: req.body.title,
+        tags,
+        players
+      })
 
-  res.json({ newVid })
+      const newVid = await newVideo.save();
+
+      res.json({ newVid })
+
+    })
+
 
 });
 
