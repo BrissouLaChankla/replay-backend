@@ -1,7 +1,5 @@
 require('dotenv').config();
 require('./models/connection');
-const cors = require('cors');
-
 var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
@@ -12,9 +10,8 @@ var usersRouter = require('./routes/users');
 
 var app = express();
 
+const cors = require('cors');
 app.use(cors());
-
-
 app.use('/uploads', express.static('uploads'));
 app.use(logger('dev'));
 app.use(express.json());
