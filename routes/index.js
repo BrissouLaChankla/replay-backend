@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 const cloudinary = require('cloudinary').v2;
-const multer = require('multer');
+
 const fs = require('fs')
 
 cloudinary.config({
@@ -10,19 +10,6 @@ cloudinary.config({
   api_secret: process.env.API_SECRET
 });
 
-
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'tmp/'); // Chemin du dossier où les fichiers seront stockés
-  },
-  filename: function (req, file, cb) {
-    // Génère le nom de fichier final avec l'extension originale
-    cb(null, file.fieldname + '-' + Date.now() + '.' + file.originalname.split('.').pop());
-  }
-});
-
-const upload = multer({ storage: storage });
 
 const Player = require('../models/Player')
 const Tag = require('../models/Tag')
@@ -65,44 +52,50 @@ router.get('/playerNTags', async (req, res) => {
   }
 });
 
-router.post('/store', upload.single('uploaded_file'), async function (req, res) {
-  const { path } = req.file
-
-  const players = [];
-  const tags = [];
-
-  for (const key in req.body) {
-    if (key.includes('player_')) {
-      players.push(key.slice(7))
-    } else if (key.includes('tag_')) {
-      tags.push(key.slice(4))
+router.post('/store', async (req, res) => {
+  try {
+    // Check if file is uploaded
+    if (!req.files || !req.files.uploaded_file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
     }
-  }
 
-  cloudinary.uploader.upload(path, {
-    resource_type: "video",
-  },
-    async function (error, result) {
-      if (error) {
-        console.log(error)
-        return res.status(500).send("Erreur lors du téléchargement du fichier : " + error.message);
+    const players = [];
+    const tags = [];
+
+    for (const key in req.body) {
+      if (key.includes('player_')) {
+        players.push(key.slice(7));
+      } else if (key.includes('tag_')) {
+        tags.push(key.slice(4));
       }
+    }
 
-      const newVideo = await new Video({
-        src: result.url,
-        date: new Date(),
-        title: req.body.title,
-        tags,
-        players
-      })
+    const photoPath = `./tmp/${req.files.uploaded_file.name}`;
+    await req.files.uploaded_file.mv(photoPath);
 
-      const newVid = await newVideo.save();
+    const resultCloudinary = await cloudinary.uploader.upload(photoPath, {
+      resource_type: "video",
+    });
 
-      res.json({ newVid })
+    fs.unlinkSync(photoPath);
 
-    })
+    // Consider adding code to delete the temporary file here
 
+    const newVideo = new Video({
+      src: resultCloudinary.secure_url,
+      date: new Date(),
+      title: req.body.title,
+      tags,
+      players,
+    });
 
+    const newVid = await newVideo.save();
+    res.json({ newVid });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while processing your request.' });
+  }
 });
+
 
 module.exports = router;
