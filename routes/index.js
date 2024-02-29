@@ -1,15 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 var express = require('express');
 var router = express.Router();
-const cloudinary = require('cloudinary').v2;
-
-
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET
-});
 
 
 const Player = require('../models/Player')
@@ -56,39 +46,27 @@ router.get('/playerNTags', async (req, res) => {
 router.post('/store', async (req, res) => {
   try {
     // Check if file is uploaded
-    if (!req.files || Object.keys(req.files).length === 0) {
+    if (!req.body) {
       return res.status(400).send('No files were uploaded.');
     }
 
-    const uploadedFile = req.files.uploaded_file;
-    const tempDir = '/tmp'; // Utilisation du répertoire temporaire
-    const tempFilePath = path.join(tempDir, uploadedFile.name);
 
-    // Déplace le fichier téléchargé vers le répertoire temporaire
-    await uploadedFile.mv(tempFilePath);
 
     // Extraction des joueurs et des tags à partir de req.body
     const players = [];
     const tags = [];
     for (const key in req.body) {
       if (key.startsWith('player_')) {
-        players.push(req.body[key]);
+        players.push(key.slice(7))
       } else if (key.startsWith('tag_')) {
-        tags.push(req.body[key]);
+        tags.push(key.slice(4))
       }
     }
 
-    // Upload le fichier vers Cloudinary
-    const resultCloudinary = await cloudinary.uploader.upload(tempFilePath, {
-      resource_type: "video",
-    });
-
-    // Suppression du fichier temporaire après l'upload
-    fs.unlinkSync(tempFilePath);
-
+  
     // Création d'un nouveau document vidéo dans votre base de données
     const newVideo = new Video({
-      src: resultCloudinary.secure_url,
+      src: req.body.imgUrl,
       date: new Date(),
       title: req.body.title,
       tags,
