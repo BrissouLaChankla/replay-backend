@@ -12,8 +12,25 @@ router.get('/', function (req, res, next) {
   res.render('index', { title: 'Express' });
 });
 
-router.get('/latest/:nbOfFetch', function (req, res, next) {
-  Video.find({}).sort('-date').skip(req.params.nbOfFetch * 6).limit(7).populate("players").populate("tags").then(videos => {
+router.post('/latest/:nbOfFetch', function (req, res, next) {
+  let filters = [];
+
+  // The $all operator selects the documents where the value of a field is an array that contains all the specified elements.
+  if (req.body.tags.length > 0) {
+    filters.push({ 'tags': { $all: req.body.tags } });
+  }
+  
+  if (req.body.players.length > 0) {
+    filters.push({ 'players': { $all: req.body.players } });
+  }
+  
+  let query = {};
+  if (filters.length > 0) {
+    query = { $and: filters };
+  }
+  
+  Video.find(query).sort('-date').skip(req.params.nbOfFetch * 6).limit(7).populate("players").populate("tags").then(videos => {
+    console.log(videos)
     if (videos.length < 7) {
       res.json({ videos: videos.slice(0, 6), lastFetch: true })
     } else {
@@ -63,7 +80,7 @@ router.post('/store', async (req, res) => {
       }
     }
 
-  
+
     // Création d'un nouveau document vidéo dans votre base de données
     const newVideo = new Video({
       src: req.body.imgUrl,
